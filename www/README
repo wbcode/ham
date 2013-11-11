@@ -1,0 +1,5 @@
+* test.php - test script, shows graph, can send info to arduino network, also uses a ajax to show a PIR activated. 
+* lp.php - axja - longpoll
+* fp.jpg - floorplan image
+* info.dat - contains 1 if PIR is triggered and 0 when not active. used by  lp.php
+* js-folder - some ajax scripts and CanvasJs, see www.canvasjs.com

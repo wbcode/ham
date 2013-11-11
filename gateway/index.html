@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<html>
+<head>
+<title>Python Tornado Test Page</title>
+<script src="http://ajax.googleapis.com/ajax/libs/jquery/1.8.2/jquery.min.js"></script>
+<script>
+function serverResponded( data ) {
+    /* 
+    log the event data, so you can see what's going on.
+    Shows up in the console on your browser. (Chrome: Tools > Developer Tools > Console)
+    */
+    console.log( data );
+    
+    // check the server status, and report it on the screen
+    if ( data.server === true ) {
+        $('#status .value').html("OK");
+    }
+    else {
+        $('#status .value').html("NOT OK");
+    }
+    
+    // add the last serial to the div on the screen
+    $('#serial .value').html( data.mostRecentSerial );
+    $('#history .value').html( data.serialHistory.replace(/\n/g, '<br />') );
+}
+
+$(document).ready( function() {
+    /* handle the click event on the get server status */
+    $('#getstatus').click( function() {
+        params = { op: "checkup" };
+        $.getJSON( 'http://10.10.11.126:8000/com' , params, serverResponded );
+    });
+    
+    $('#getversion').click( function() {
+        params = { cmd: "0;0;33;Get Version\n" };
+        $.getJSON( 'http://10.10.11.126:8000/com' , params, serverResponded );
+    });
+    
+});
+</script>
+</head>
+<body>
+	  <div id="getstatus" style="cursor: pointer;">GET SERVER STATUS</div>
+	  <div id="getversion" style="cursor: pointer;">GET VERAGATEWAY VERSION</div>
+    <br>
+    <br>
+    <div id="status">
+        <b>Server Status:</b> <span class="value">?</span>
+    </div>
+    
+    <div id="serial">
+        <b>Last Serial Input:</b> <span class="value"></span>
+    </div>
+    
+    <div id="history">
+    		<b>Last Serial History:</b> <br><span class="value"></span>
+    </div>
+</body>

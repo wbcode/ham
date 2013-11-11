@@ -1,0 +1,8 @@
+### Quick
+* Configure VeraGw.conf
+* Run using "sudo python Gateway.py"
+
+### Info
+* Coded and tested on for Raspberry Pi
+* uses mongodb to store info
+* python packages python-tornado python-serial
