@@ -1,4 +1,1 @@
-ham
-===
-
-Home automation and monitoring
+Start here https://github.com/wbcode/ham/wiki
