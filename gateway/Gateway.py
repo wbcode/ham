@@ -1,4 +1,5 @@
 #! /usr/bin/python2.7
+# imports
 import os
 import json
 import tornado.ioloop
@@ -47,6 +48,7 @@ class IndexHandler(tornado.web.RequestHandler):
 class CommandHandler(tornado.web.RequestHandler):
     def set_default_headers(self):
         self.set_header("Access-Control-Allow-Origin", "http://10.10.11.126")
+        #self.set_header("Access-Control-Allow-Origin", "http://192.168.100.33")
     #both GET and POST requests have the same responses
     def get(self, url = '/'):
         print "get"
@@ -67,11 +69,24 @@ class CommandHandler(tornado.web.RequestHandler):
             status = {"server": True, "mostRecentSerial": mostRecentLine, "serialHistory": serialHistory}
             #turn it to JSON and send it to the browser
             self.write( json.dumps(status) )
+		#reload the config file	
+        elif self.get_argument('op',None) == "reloadconfig":
+			config.read("VeraGW.conf")
+			#mostRecentLine = 'Reload config file\r\n'
+			#serialHistory += 'Reload config file\r\n'
+			#make a dictionary
+			status = {"server": True, "mostRecentSerial": mostRecentLine, "serialHistory": serialHistory}
+			#turn it to JSON and send it to the browser
+			self.write( json.dumps(status) )
         elif self.get_argument('cmd',None) is not None:
-        	  vera.sendCommandOne(self.get_argument('cmd',None))
-        	  status = {"server": True, "mostRecentSerial": mostRecentLine, "serialHistory": serialHistory}
-        	  self.write( json.dumps(status) )
-        #operation was not one of the ones that we know how to handle
+			vera.sendCommandOne(self.get_argument('cmd',None)+'\n')
+			status = {"server": True, "mostRecentSerial": mostRecentLine, "serialHistory": serialHistory}
+			self.write( json.dumps(status) )
+        elif self.get_argument('oh',None) is not None:
+			#send to openhab file for parsing
+			print self.request
+			vera.parseExternalCommand('OpenHab',self.get_argument('oh',None),self.get_argument('type',None),self.get_argument('state',None))
+	   #operation was not one of the ones that we know how to handle
         else:
             print op
             print self.request
@@ -100,6 +115,5 @@ if __name__ == "__main__":
     
     #start tornado
     application.listen(int(config.get('httpd','port')),config.get('httpd','ip'))
-    print("Starting server on port number %i..." % tornadoPort )
-    print("Open at http://127.0.0.1:%i/index.html" % tornadoPort )
+    print("Starting server on http://%s:%s" % (config.get('httpd','ip'),config.get('httpd','port')) )
     tornado.ioloop.IOLoop.instance().start()

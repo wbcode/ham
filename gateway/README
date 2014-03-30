@@ -4,5 +4,14 @@
 
 ### Info
 * Coded and tested on for Raspberry Pi
-* uses mongodb to store info
 * python packages python-tornado python-serial
+
+### Files
+* Domoticz.py - Domoticz integarion
+* Gateway.py - Main program
+* index.html - Used by the tornada webserver
+* Openhab.py - Openhab integarion
+* VeraGW.conf - Configuration file see wiki for information
+* VeraGW.log - Logfile
+* VeraGW.py - Interact with the Arduino Gateway
+
