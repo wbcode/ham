@@ -14,4 +14,6 @@ Start here https://github.com/wbcode/ham/wiki
 * Still needs cleaning from lua code.
 * Make it easier to configure.
 * Make it module based 
+* Replace Configparser to something that don't kill comments in config file.
 * Documentation
+* Name the python gateway to something 1337 c001...
