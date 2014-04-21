@@ -84,11 +84,9 @@ class CommandHandler(tornado.web.RequestHandler):
 			self.write( json.dumps(status) )
         elif self.get_argument('oh',None) is not None:
 			#send to openhab file for parsing
-			print self.request
 			vera.parseExternalCommand('OpenHab',self.get_argument('oh',None),self.get_argument('type',None),self.get_argument('state',None))
 	   #operation was not one of the ones that we know how to handle
         else:
-            print op
             print self.request
             raise tornado.web.HTTPError(404, "Missing argument 'op' or not recognized")
 

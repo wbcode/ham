@@ -5,16 +5,21 @@ import serial
 from time import sleep
 import logging
 import ConfigParser
-import rrdtool
 import time
 import datetime
 import json
 import requests
 from Openhab import *
 from Domoticz import *
+from Rrd import *
 
 
 class VeraGW():
+	
+	#supported integrations
+	oh = None
+	dom = None
+	rrd = None
 
 	#supported version
 	PLUGIN_VERSION = "1.2+"
@@ -138,7 +143,6 @@ class VeraGW():
 
 	#lookup tables
 	childIdLookupTable = {}
-	rrdsLookupTable = {}
 	availableIds = [True]*254
 	
 	for k, v in tVarTypes.iteritems():
@@ -169,95 +173,41 @@ class VeraGW():
 			return response
 		return None
 
-#OLD keeping for refernce		
-#	def setVariable(self, incomingData, childId):
-#		if childId is not None:
-#			index = int(incomingData[3]);
-#			variable = self.tVarTypes[self.tVarLookupNumType[index]]
-#			value = incomingData[4].strip()
-#			if variable[1] is not None:
-#				self.log.info("setVariable: RaidoId: "+incomingData[0]+" Sensor: "+incomingData[1]+" ChildId: "+childId+" Type: " +self.tVarLookupNumType[index]+" reporting value: "+ value)
-#				post = { "childid": childId,
-#		     			 "value": value,
-#		     			 "type": incomingData[3],
-#		     			 "time": datetime.datetime.utcnow()}
-#				#poor mans hook if you know how to hook this can be done better.
-#				self.hooking(incomingData, childId)
-	
-#				posts = self.db.sd
-#				post_id = posts.insert(post)
-
 	def setVariable(self, incomingData, childId, nodeId):
 		if (childId is not None) :
-			# Set variable on child sensor.
-			#print "bra"
+			# Set variable reported from a child sensor.
 			index = int(incomingData[3]);
 			varType = self.tVarLookupNumType[index]
 			var = self.tVarTypes[varType]
 			value = incomingData[4]
 			if (var[1] is not None): 
-				self.log.info("setVariable: RaidoId: "+incomingData[0]+" Sensor: "+incomingData[1]+" ChildId: "+childId+" Type: " +self.tVarLookupNumType[index]+" reporting value: "+ value)
+				self.log.info("setVariable: RaidoId: "+incomingData[0]+" Sensor: "+incomingData[1]+" ChildId: "+str(childId)+" Type: " +self.tVarLookupNumType[index]+" reporting value: "+ value)
 				
-				## add to RRD if we can
-				# Move to separate class
-				if self.config.has_option('rrds',childId) and self.config.get('config','rrd') == 'true':
-					rrds = self.config.get('rrds',childId)
-					arrds = rrds.split(",")
-					for s in arrds:
-						splitted = s.split(";")
-						file = splitted[0]
-						ds = splitted[1]
-						print 'update:'+'rrd/'+file+'.rrd', '-t',ds, 'N:'+value.strip()
-						ret = rrdtool.update('rrd/'+file+'.rrd', '-t',ds, 'N:'+value.strip())
-						#print ret
-						if ret:
-							print rrdtool.error()
-							
+				#Support integrations			
+				# Add info to RRD
+				if self.config.has_option('rrds',childId) and self.rrd is not None:
+					self.rrd.setVariable(incomingData, childId, nodeId)
+				
 				# Add info to Domoticz
-				if self.config.has_option('domoticz',childId) and self.config.get('config','domoticz') == 'true':
-					# maybe do a global variable or some module thingy of this
-					d = Domoticz(self.config, self.log)
-					d.setVariable(incomingData, childId, nodeId)
+				if self.config.has_option('domoticz',childId) and self.dom is not None:
+					self.dom.setVariable(incomingData, childId, nodeId)
 				
 				# Add info to Openhab
-				if self.config.has_option('openhab',childId) and self.config.get('config','openhab') == 'true':
-					# maybe do a global variable or some module thingy of this
-					oh = Openhab(self.config, self.log)
-					oh.setVariable(incomingData, childId, nodeId)
+				if self.config.has_option('openhab',childId) and self.oh is not None:
+					self.oh.setVariable(incomingData, childId, nodeId)
 				
 				self.setVariableIfChanged(var[1], var[2], value, childId)
 			
 				# Handle special variables battery level and tripped which also
-				# should update other variables to os.time()
+				# should update other variables to os.time(). This part should be removed...
 				if (varType == "TRIPPED" and value == "1") :
 					variable = self.tInternalTypes["LAST_TRIP"]
 					self.setVariableIfChanged(variable[1], variable[2], int(time.time()), childId)
-				else:
-					variable = self.tInternalTypes["LAST_UPDATE"]
-					self.setVariableIfChanged(variable[1], variable[2], int(time.time()), childId)
-			
-				
-				#This is removed in later parts...
-				#nodeDevice = self.childIdLookupTable[nodeId+";255"+self.NODE_CHILD_ID] 
-                # Always update LAST_UPDATE for node   
-                #if (nodeDevice is not None):
-                #    setVariableIfChanged(variable[1], variable[2], os.time(), nodeDevice)
-			
+
+	# Still here since a lot of methods sends info to this one.
 	def setVariableIfChanged(self, serviceId, name, value, deviceId):
 	
 		self.log.info("setVariableIfChanged: "+serviceId +","+name+", "+str(value)+", "+deviceId)
-		#ret = rrdtool.update('speed.rrd','N:' + `total_input_traffic` + ':' + `total_output_traffic`);
-		#if ret:
-		#	print rrdtool.error()
-			
-		#local curValue = luup.variable_get(serviceId, name, deviceId)
-		
-		#if ((value ~= curValue) or (curValue == nil)) then
-		#	luup.variable_set(serviceId, name, value, deviceId)
-		#	return True
-			
-		#else
-		#	return False
 				
 #done				
 	def nextAvailiableRadioId(self):
@@ -291,20 +241,16 @@ class VeraGW():
 				
 				index += 1
 				
-				self.childIdLookupTable[index] = altId
+				self.childIdLookupTable[altId] = index
 				self.config.set('childIds',str(index),altId+";"+type)
 				
 				with open('VeraGW.conf', 'wb') as configfile:
 					self.config.write(configfile)
 				
 				self.inclusionResult[altId] = type
-			elif (mode == 0 and device is not None and childId == self.NODE_CHILD_ID):
-				#Store version information if this is radio node
-				var = self.tInternalTypes["VERSION"]
-				self.setVariableIfChanged(var[1], var[2], data, device)
-				if (data != self.GATEWAY_VERSION):
-					#The library version of sensor differs from plugin version. Warn about it.
-					self.log.warn("presentation: Doesn't match Gateway version("+self.GATEWAY_VERSION+ "). Radio: "+ incomingData[0] + " Sensor: "+incomingData[1] + " using version: " + incomingData[4])
+			elif (mode == 0 and device is not None and childId == self.NODE_CHILD_ID and data != self.GATEWAY_VERSION):
+				#The library version of sensor differs from plugin version. Warn about it.
+				self.log.warn("presentation: Doesn't match Gateway version("+self.GATEWAY_VERSION+ "). Radio: "+ incomingData[0] + " Sensor: "+incomingData[1] + " using version: " + incomingData[4])
 
 #done is going to need a lot of work...					
 	def processInternalMessage(self, incomingData, iChildId, iAltId):
@@ -319,9 +265,21 @@ class VeraGW():
 			self.log.info('processInternalMessage: Gateway running version: '+self.GATEWAY_VERSION )
 			print("Connected to Mysensor Gateway running version %s" % data)
 		elif ((varType == "SKETCH_NAME" or varType == "SKETCH_VERSION") and iChildId is not None) :
-		#-- Store the Sketch name and Version
-		#fix this somehow
-			self.setVariableIfChanged(var[1], var[2], data, iChildId)
+			# Store the Sketch name and Version
+			v = self.config.get('childIds',str(iChildId))
+			d = v.split(";")
+			name = d[2]
+			version = d[2]
+			if varType == "SKETCH_NAME" : 
+				name = data.rstrip()
+			elif varType == "SKETCH_VERSION" :
+				version = data.rstrip()
+			
+			self.config.set('childIds',str(iChildId),iAltId+";"+name+";"+version)
+			
+			with open('VeraGW.conf', 'wb') as configfile:
+				self.config.write(configfile)
+
 		elif (varType == "TIME"):
 			#Request time was sent from one of the sensors
 			self.sendInternalCommand(iAltId,"TIME",time.time())
@@ -383,18 +341,6 @@ class VeraGW():
 							newDevices = -100
 					else :
 						self.log.info("processInternalMessage: Device "+altId+" already exists.")
-				#fixme this added all the device info.	
-				#if (newDevices > 0) :
-				#	-- Append all old device children
-				#	for k, v in pairs(luup.devices) do
-				#		if v.device_num_parent == ARDUINO_DEVICE then
-				#			luup.chdev.append(ARDUINO_DEVICE, child_devices, v.id, v.description, v.device_type,v.device_file,"","",false)
-				#		end
-				#	end
-				#	task ("Found new Arduino sensor(s). Need to restart. Please wait.",TASK_BUSY)
-				#	luup.chdev.sync(ARDUINO_DEVICE,child_devices)
-				#	return
-				#end
 			else:
 				self.setVariableIfChanged(ARDUINO_SID, "InclusionFoundCountHR", "0 devices found", ARDUINO_DEVICE)
 
@@ -422,7 +368,6 @@ class VeraGW():
 		return self.sendCommandWithMessageType(altid, "SET_VARIABLE", int(tVarTypes[variableId][0]), value)
 #done	
 	def sendNodeCommand(self, device, variableId, value):
-		#return self.sendCommandWithMessageType(luup.devices[device].id, "SET_VARIABLE", int(tVarTypes[variableId][0]), value)
 		return self.sendCommandWithMessageType(device+";255", "SET_VARIABLE", int(tVarTypes[variableId][0]), value)
 #done	
 	def sendInternalCommand(self, altid, variableId, value):
@@ -480,10 +425,11 @@ class VeraGW():
 		if (variable[2] is not None and childId is not None): 
 			value = None
 			self.log.debug("Request status for "+ variable[2])
+			
 			#openhab
-			if self.config.has_option('openhab',childId) and self.config.get('config','openhab') == 'true':
+			if self.config.has_option('openhab',childId) and self.oh is not None:
 				oh = Openhab(self.config, self.log)
-				value=oh.requestStatus(incomingData, childId, altId)
+				value=self.oh.requestStatus(incomingData, childId, altId)
 			#support others here like Domoticz
 	
 
@@ -493,17 +439,13 @@ class VeraGW():
 			else :
 				self.sendRequestResponse(altId,varType,value)
 			
-	#Parse command from external GUI:s like Openhab
+	#Parse command from external GUI:s like Openhab move this to Openhab file
 	def parseExternalCommand(self,external,name,type,state) :
-		if external == "OpenHab" and self.config.get('config','openhab') == 'true':
-			# Do this part better so we don't have to build a table every time.
-			oh = Openhab(self.config, self.log)
-			value=oh.parseCommand(type,state)
-			if value is not None :
-				openHabLookupTable = {}
-				for k, v in self.config.items("openhab") :
-					openHabLookupTable[v] = k
-				childId = openHabLookupTable[name]
+		#Openhab support
+		if external == "OpenHab" and self.oh is not None:
+			value=self.oh.parseCommand(type,state)
+			childId = self.oh.getChildIdFromNane(name)
+			if value is not None and childId is not None :
 				device = self.config.get('childIds',childId)
 				action=self.msgType["SET_VARIABLE"]
 				self.sendCommandOne(device+";"+value+'\n')
@@ -558,6 +500,9 @@ class VeraGW():
 	def setDimmerLevel(self, device, newLoadlevelTarget):
 		self.sendCommand(luup.devices[device].id,"DIMMER",newLoadlevelTarget)
 
+	def setLockStatus(device, newTargetValue) :
+		sendCommand(luup.devices[device].id,"LOCK",newTargetValue)
+		
 	# Security commands
 	def setArmed(self, device, newArmedValue):
 		self.setVariableIfChanged(tVarTypes.ARMED[2], tVarTypes.ARMED[3], newArmedValue, device)
@@ -567,7 +512,7 @@ class VeraGW():
 		self.childIdLookupTable[radioId+";"+childId] = deviceId
 		self.availableIds[radioId] = False
 			
-#partly done
+#done
 	def __init__(self, xconfig, xlog):
 		self.log=xlog
 		self.config=xconfig
@@ -578,15 +523,25 @@ class VeraGW():
 			self.childIdLookupTable[value[0]+";"+value[1]] = k
 			self.availableIds[int(value[0])]=False
 		
-		#load rrds
-		for k, v in self.config.items("rrds") :
-			self.rrdsLookupTable[v] = k
+		
 		
 		#load unit M/I from file (A good programmer should check input values)
 		self.unit = self.config.get('config','unit')
 		
 		#load unit InclutionMode from file (A good programmer should check input values...)
 		self.InclutionMode = int(self.config.get('config','inclusion-mode'))
+		
+		#initiate integrations
+		#Openhab
+		if self.config.get('config','openhab') == 'true':
+			self.oh = Openhab(self.config, self.log)
+		#Domoticz
+		if self.config.get('config','domoticz') == 'true':
+			self.dom = Domoticz(self.config, self.log)
+		
+		#RRD
+		if self.config.get('config','rrd') == 'true':
+			self.rrd = Rrd(self.config, self.log)
 		
 		#open serial interface 
 		self.ser = serial.Serial(self.config.get('config','port'),self.config.get('config','baudrate'),timeout=1)
