@@ -295,9 +295,8 @@ class VeraGW():
 			### Have a look at the one below
 			#setVariableIfChanged(var[1], "RelayNodeHR", data == "0" and "GW" or data, iChildId)
 		elif (varType == "BATTERY_LEVEL"):
-			self.setVariableIfChanged(var[1], var[2], data, iChildId)
-			variable = self.tInternalTypes["BATTERY_DATE"]
-			self.setVariableIfChanged(variable[1], variable[2], int(time.time()), iChildId)
+		# Send to serVariable since you usally want to store this info.
+			self.setVariable(incomingData, iChildId, iAltId)			
 		elif (varType == "INCLUSION_MODE"):
 			self.setVariableIfChanged(var[1], var[2], data, ARDUINO_DEVICE)
 			if (data == "0") :
