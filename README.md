@@ -17,3 +17,8 @@ Start here https://github.com/wbcode/ham/wiki
 * Replace Configparser to something that don't kill comments in config file.
 * Documentation
 * Name the python gateway to something 1337 c001...
+
+### Folders
+* arduino - lab code that work with MySensor network
+* gateway - middleware that integrates MySensor network with third part like Openhab
+* www - lab code that can make calls to and from the gateway
