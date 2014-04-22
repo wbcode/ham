@@ -19,13 +19,17 @@ class Rrd():
 				if ret:
 					self.log.error('setVariable: RRD :'+rrdtool.error())
 		
-		#Implement
-		def requestStatus(self, incomingData, childId, altId):
-			return None
-			
-		#Implement
-		def parseCommand(self,type,state) :
-			return None
+	#Implement
+	def requestStatus(self, incomingData, childId, altId):
+		return None
+		
+	#Implement
+	def parseCommand(self,type,state) :
+		return None
+	
+	#Implement
+	def reloadConfig(self) :
+		return None
 	
 	def __init__(self, xconfig, xlog):
 		self.log=xlog

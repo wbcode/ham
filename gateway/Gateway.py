@@ -47,22 +47,18 @@ class IndexHandler(tornado.web.RequestHandler):
 # handle commands sent from the web browser
 class CommandHandler(tornado.web.RequestHandler):
     def set_default_headers(self):
-        self.set_header("Access-Control-Allow-Origin", "http://10.10.11.126")
-        #self.set_header("Access-Control-Allow-Origin", "http://192.168.100.33")
+        self.set_header("Access-Control-Allow-Origin", "http://"+config.get('httpd','ip'))
     #both GET and POST requests have the same responses
     def get(self, url = '/'):
-        print "get"
+        #print "get"
         self.handleRequest()
         
     def post(self, url = '/'):
-        print 'post'
+        #print 'post'
         self.handleRequest()
     
     # handle both GET and POST requests with the same function
     def handleRequest( self ):
-        # is op to decide what kind of command is being sent
-        #op = self.get_argument('op',None)
-        
         #received a "checkup" operation command from the browser:
         if self.get_argument('op',None) == "checkup":
             #make a dictionary
@@ -72,12 +68,8 @@ class CommandHandler(tornado.web.RequestHandler):
 		#reload the config file	
         elif self.get_argument('op',None) == "reloadconfig":
 			config.read("VeraGW.conf")
-			#mostRecentLine = 'Reload config file\r\n'
-			#serialHistory += 'Reload config file\r\n'
-			#make a dictionary
-			status = {"server": True, "mostRecentSerial": mostRecentLine, "serialHistory": serialHistory}
-			#turn it to JSON and send it to the browser
-			self.write( json.dumps(status) )
+			vera.reloadConfig()
+			log.info("Configuration reloaded")
         elif self.get_argument('cmd',None) is not None:
 			vera.sendCommandOne(self.get_argument('cmd',None)+'\n')
 			status = {"server": True, "mostRecentSerial": mostRecentLine, "serialHistory": serialHistory}

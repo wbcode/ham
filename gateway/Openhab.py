@@ -118,12 +118,19 @@ class Openhab():
 		else :
 			return None
 	
-	def __init__(self, xconfig, xlog):
-		self.log=xlog
-		self.config=xconfig
+	def reloadConfig(self) :
 		
+		#Get all items from Openhab
 		self.getOpebHabItems()
 		
 		#populate openHabLookupTable
 		for k, v in self.config.items("openhab") :
 			self.openHabLookupTable[v] = k
+	
+	def __init__(self, xconfig, xlog):
+		self.log=xlog
+		self.config=xconfig
+		
+		self.reloadConfig()
+		
+		

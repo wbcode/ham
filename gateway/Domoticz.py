@@ -25,13 +25,17 @@ class Domoticz():
 		if data['status'] != 'OK' :
 			self.log.error("setVariable: Domoticz get url: "+resp.url+" Domoticz error:" + data )
 
-		#Implement
-		def requestStatus(self, incomingData, childId, altId):
-			return None
-			
-		#Implement
-		def parseCommand(self,type,state) :
-			return None
+	#Implement
+	def requestStatus(self, incomingData, childId, altId):
+		return None
+		
+	#Implement
+	def parseCommand(self,type,state) :
+		return None
+	
+	#Implement
+	def reloadConfig(self) :
+		return None
 	
 	def __init__(self, xconfig, xlog):
 		self.log=xlog

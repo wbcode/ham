@@ -438,25 +438,6 @@ class VeraGW():
 			else :
 				self.sendRequestResponse(altId,varType,value)
 			
-	#Parse command from external GUI:s like Openhab move this to Openhab file
-	def parseExternalCommand(self,external,name,type,state) :
-		#Openhab support
-		if external == "OpenHab" and self.oh is not None:
-			value=self.oh.parseCommand(type,state)
-			childId = self.oh.getChildIdFromNane(name)
-			if value is not None and childId is not None :
-				device = self.config.get('childIds',childId)
-				action=self.msgType["SET_VARIABLE"]
-				self.sendCommandOne(device+";"+value+'\n')
-			else :	
-				self.log.error("parseExternalCommand: Missing value to send")
-		#elif external == "Domoticz" ....
-			#Write the code to support Domoticz
-		else :
-			self.log.error("parseExternalCommand: Don't support external commands for type: "+ external)
-			
-			
-	
 	#Arduino GW device commands
 	def startInclusion(device):
 		return sendInternalCommand("0;0","INCLUSION_MODE","1")
@@ -510,19 +491,14 @@ class VeraGW():
 	def updateLookupTables(self, radioId, childId, deviceId):
 		self.childIdLookupTable[radioId+";"+childId] = deviceId
 		self.availableIds[radioId] = False
-			
-#done
-	def __init__(self, xconfig, xlog):
-		self.log=xlog
-		self.config=xconfig
-		
+
+	### Support functions 	
+	def reloadConfig(self) :
 		#load known sensors from file
 		for k, v in self.config.items("childIds") :
 			value = v.split(';')
 			self.childIdLookupTable[value[0]+";"+value[1]] = k
 			self.availableIds[int(value[0])]=False
-		
-		
 		
 		#load unit M/I from file (A good programmer should check input values)
 		self.unit = self.config.get('config','unit')
@@ -533,14 +509,58 @@ class VeraGW():
 		#initiate integrations
 		#Openhab
 		if self.config.get('config','openhab') == 'true':
-			self.oh = Openhab(self.config, self.log)
+			if self.oh is None :
+				self.oh = Openhab(self.config, self.log)
+			else :
+				self.oh.reloadConfig()
+		else :
+			self.oh = None
+			
 		#Domoticz
 		if self.config.get('config','domoticz') == 'true':
-			self.dom = Domoticz(self.config, self.log)
+			if self.dom is None :
+				self.dom = Domoticz(self.config, self.log)
+			else :
+				self.dom.reloadConfig()
+		else :
+			self.dom = None
 		
 		#RRD
 		if self.config.get('config','rrd') == 'true':
-			self.rrd = Rrd(self.config, self.log)
+			if self.rrd is None :
+				self.rrd = Rrd(self.config, self.log)
+			else :
+				self.rrd.reloadConfig()
+		else :
+			self.rrd = None
+		
+		self.log.info("reloadConfig: Configuration reloaded.")
+		
+		
+	
+	#Parse command from external GUI:s like Openhab move this to Openhab file
+	def parseExternalCommand(self,external,name,type,state) :
+		#Openhab support
+		if external == "OpenHab" and self.oh is not None:
+			value=self.oh.parseCommand(type,state)
+			childId = self.oh.getChildIdFromNane(name)
+			if value is not None and childId is not None :
+				device = self.config.get('childIds',childId)
+				action=self.msgType["SET_VARIABLE"]
+				self.sendCommandOne(device+";"+value+'\n')
+			else :	
+				self.log.error("parseExternalCommand: Missing value to send")
+		#elif external == "Domoticz" ....
+			#Write the code to support Domoticz
+		else :
+			self.log.error("parseExternalCommand: Don't support external commands for type: "+ external)
+		
+	#main
+	def __init__(self, xconfig, xlog):
+		self.log=xlog
+		self.config=xconfig
+	
+		self.reloadConfig()
 		
 		#open serial interface 
 		self.ser = serial.Serial(self.config.get('config','port'),self.config.get('config','baudrate'),timeout=1)
