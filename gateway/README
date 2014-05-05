@@ -1,5 +1,5 @@
 ### Quick
-* Configure VeraGw.conf
+* Configure msgw.conf
 * Run using "sudo python Gateway.py"
 
 ### Info
@@ -12,7 +12,7 @@
 * index.html - Used by the tornada webserver
 * Openhab.py - Openhab integarion
 * Rrd.py - Rrd  integarion
-* VeraGW.conf - Configuration file see wiki for information
-* VeraGW.log - Logfile
-* VeraGW.py - Interact with the Arduino Gateway
+* msgw.conf - Configuration file see wiki for information
+* msgw.log - Logfile
+* msgw.py - Interact with the Arduino Gateway
 
