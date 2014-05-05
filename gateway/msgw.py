@@ -14,7 +14,7 @@ from Domoticz import *
 from Rrd import *
 
 
-class VeraGW():
+class msgw():
 	
 	#supported integrations
 	oh = None
@@ -39,7 +39,7 @@ class VeraGW():
 	inclusionResult = {}
 	includeCount = 0
 	
-	#Variables in Vera can be overridded in config file
+	#Variables in msgw can be overridded in config file
 	InclusionMode = 0
 	unit = "M"
 	
@@ -176,6 +176,7 @@ class VeraGW():
 	def setVariable(self, incomingData, childId, nodeId):
 		if (childId is not None) :
 			# Set variable reported from a child sensor.
+			childId = str(childId)
 			index = int(incomingData[3]);
 			varType = self.tVarLookupNumType[index]
 			var = self.tVarTypes[varType]
@@ -207,7 +208,7 @@ class VeraGW():
 	# Still here since a lot of methods sends info to this one.
 	def setVariableIfChanged(self, serviceId, name, value, deviceId):
 	
-		self.log.info("setVariableIfChanged: "+serviceId +","+name+", "+str(value)+", "+deviceId)
+		self.log.info("setVariableIfChanged: "+serviceId +","+name+", "+str(value)+", "+str(deviceId))
 				
 #done				
 	def nextAvailiableRadioId(self):
@@ -221,9 +222,9 @@ class VeraGW():
 	def  presentation(self, incomingData, device, childId, altId):
 		type = incomingData[3]
 		data = incomingData[4]
-		mode = self.InclusionMode
+		mode = bool(self.InclusionMode)
 
-		if (mode == 0 and device is None):
+		if (mode == 'true' and device is None):
 			#A new sensor (not created before) was presented during inclusion mode
 			if (altId not in self.inclusionResult): 
 				self.log.info("presentation: New sensor starting up. Radio: "+ incomingData[0] + " Sensor: "+incomingData[1])
@@ -244,8 +245,7 @@ class VeraGW():
 				self.childIdLookupTable[altId] = index
 				self.config.set('childIds',str(index),altId+";"+type)
 				
-				with open('VeraGW.conf', 'wb') as configfile:
-					self.config.write(configfile)
+				self.writeConfigFile()
 				
 				self.inclusionResult[altId] = type
 			elif (mode == 0 and device is not None and childId == self.NODE_CHILD_ID and data != self.GATEWAY_VERSION):
@@ -277,8 +277,7 @@ class VeraGW():
 			
 			self.config.set('childIds',str(iChildId),iAltId+";"+name+";"+version)
 			
-			with open('VeraGW.conf', 'wb') as configfile:
-				self.config.write(configfile)
+			self.writeConfigFile()
 
 		elif (varType == "TIME"):
 			#Request time was sent from one of the sensors
@@ -296,53 +295,12 @@ class VeraGW():
 			#setVariableIfChanged(var[1], "RelayNodeHR", data == "0" and "GW" or data, iChildId)
 		elif (varType == "BATTERY_LEVEL"):
 		# Send to serVariable since you usally want to store this info.
-			self.setVariable(incomingData, iChildId, iAltId)			
+			self.setVariable(incomingData, str(iChildId), iAltId)			
 		elif (varType == "INCLUSION_MODE"):
-			self.setVariableIfChanged(var[1], var[2], data, ARDUINO_DEVICE)
-			if (data == "0") :
-				self.setVariableIfChanged(ARDUINO_SID, "InclusionFoundCountHR", "", ARDUINO_DEVICE)
-				inclusionCount = 0
-				#Here comes the presentation data from sensors
-				newDevices = 0
-				#check type of this variable
-				child_devices
-				self.log.info("processInternalMessage: Inclusion mode ended.")
-
-				for altId, deviceType in inclusionResult.iteritems():
-					childId = self.childIdLookupTable[altId] 
-					if (childId == None): 
-						deviceId = self.tDeviceLookupNumType[int(deviceType)]
-						if (deviceId != None):		
-							splitted = altId.split(";")
-							nodeId = splitted[0]
-							childId = splitted[1]
-							#Check this empty variable
-							name
-
-							#A new child sensor has been found. Create it!
-							deviceType = tDeviceTypes[deviceId]
-							#Create device if device sent presentation
-							if (newDevices == 0):
-								#check this creates a new device
-								child_devices = luup.chdev.start(ARDUINO_DEVICE)
-							
-							if (childId == self.NODE_CHILD_ID):
-								name = nodeId
-							else:
-								name = nodeId + ":" + childId
-							
-							#append newly found sensor device
-							#check below here we add new devices...
-							#luup.chdev.append(ARDUINO_DEVICE, child_devices, altId, "Arduino " .. deviceType[4]..name, deviceType[2],deviceType[3],"","",false)
-							newDevices = newDevices + 1		
-						else:
-							self.log.error("processInternalMessage: Found unknown device type " + deviceType +". Inclusion aborted. Please try again.")
-							newDevices = -100
-					else :
-						self.log.info("processInternalMessage: Device "+altId+" already exists.")
-			else:
-				self.setVariableIfChanged(ARDUINO_SID, "InclusionFoundCountHR", "0 devices found", ARDUINO_DEVICE)
-
+			if data == "0" : 
+				self.log.info("processInternalMessage: Inclusion mode started")
+			elif data == "1" :
+				self.log.info("processInternalMessage: Inclusion mode ended")
 		elif (varType == "CHILDREN"):
 			self.setVariableIfChanged(var[1], var[2], data, iChildId)
 		elif (varType == "LOG_MESSAGE"):
@@ -415,7 +373,7 @@ class VeraGW():
 
 	def requestStatus(self, incomingData, childId, altId):
 		self.log.debug("Requesting status for: "+altId)
-		#A device request its current status from vera (when staring up)
+		#A device request its current status from msgw (when staring up)
 		index = int(incomingData[3])	
 		varType = self.tVarLookupNumType[index]
 		
@@ -439,12 +397,14 @@ class VeraGW():
 				self.sendRequestResponse(altId,varType,value)
 			
 	#Arduino GW device commands
-	def startInclusion(device):
-		return sendInternalCommand("0;0","INCLUSION_MODE","1")
+	def startInclusion(self):
+		self.config.set('config','inclusion-mode',"true")
+		return self.sendInternalCommand("0;0","INCLUSION_MODE","1")
 
 
-	def stopInclusion(device):
-		return sendInternalCommand("0;0","INCLUSION_MODE","0")
+	def stopInclusion(self):
+		self.config.set('config','inclusion-mode',"false")
+		return self.sendInternalCommand("0;0","INCLUSION_MODE","0")
 
 			
 	#Arduino relay node device commands
@@ -465,35 +425,13 @@ class VeraGW():
 		self.setVariableIfChanged(variable[1], variable[2], "Refreshing...", device)
 		#self.sendInternalCommand(luup.devices[device].id,"RELAY_NODE","")
 		self.sendInternalCommand(device+";255","RELAY_NODE","")
-		
-	def windowCovering(self, device, action):
-		#self.sendCommand(luup.devices[device].id,action,"")
-		self.sendCommand(device+";255",action,"")
-					
-	# Power and dimmer commands
-	def switchPower(self, device, newTargetValue):
-		self.sendCommand(luup.devices[device].id,"LIGHT",newTargetValue)
 
-	def sendIrCommand(self, device, irCodeNumber):
-		self.sendCommand(luup.devices[device].id,"IR_SEND",irCodeNumber)
-
-	def setDimmerLevel(self, device, newLoadlevelTarget):
-		self.sendCommand(luup.devices[device].id,"DIMMER",newLoadlevelTarget)
-
-	def setLockStatus(device, newTargetValue) :
-		sendCommand(luup.devices[device].id,"LOCK",newTargetValue)
-		
-	# Security commands
-	def setArmed(self, device, newArmedValue):
-		self.setVariableIfChanged(tVarTypes.ARMED[2], tVarTypes.ARMED[3], newArmedValue, device)
-
-		
 	def updateLookupTables(self, radioId, childId, deviceId):
 		self.childIdLookupTable[radioId+";"+childId] = deviceId
 		self.availableIds[radioId] = False
 
 	### Support functions 	
-	def reloadConfig(self) :
+	def reloadConfig(self, bootup = False) :
 		#load known sensors from file
 		for k, v in self.config.items("childIds") :
 			value = v.split(';')
@@ -503,8 +441,13 @@ class VeraGW():
 		#load unit M/I from file (A good programmer should check input values)
 		self.unit = self.config.get('config','unit')
 		
-		#load unit InclutionMode from file (A good programmer should check input values...)
-		self.InclutionMode = int(self.config.get('config','inclusion-mode'))
+		#load InclutionMode from file and send it to gateway(A good programmer should check input values...)
+		self.InclutionMode = self.config.get('config','inclusion-mode')
+
+		#at bootup this is executed from init
+		if bootup is False :
+			self.setInclutionMode(self.InclutionMode)
+				
 		
 		#initiate integrations
 		#Openhab
@@ -537,6 +480,20 @@ class VeraGW():
 		self.log.info("reloadConfig: Configuration reloaded.")
 		
 		
+	#Parse Inclusion mode and sends the command to the Gateway
+	def setInclutionMode(self, value) :
+		if value == 'true' :
+			self.startInclusion()
+		elif value == 'false' :
+			self.stopInclusion()
+		else :
+			self.log.warn("setInclutionMode : Invalid value :" +str(value))
+		self.writeConfigFile()
+
+	# Write persist the config file
+	def writeConfigFile(self) :
+		with open('msgw.conf', 'wb') as configfile:
+			self.config.write(configfile)
 	
 	#Parse command from external GUI:s like Openhab move this to Openhab file
 	def parseExternalCommand(self,external,name,type,state) :
@@ -544,7 +501,9 @@ class VeraGW():
 		if external == "OpenHab" and self.oh is not None:
 			value=self.oh.parseCommand(type,state)
 			childId = self.oh.getChildIdFromNane(name)
-			if value is not None and childId is not None :
+			if type == "InclusionMode" :
+				self.setInclutionMode(value)
+			elif value is not None and childId is not None :
 				device = self.config.get('childIds',childId)
 				action=self.msgType["SET_VARIABLE"]
 				self.sendCommandOne(device+";"+value+'\n')
@@ -560,7 +519,7 @@ class VeraGW():
 		self.log=xlog
 		self.config=xconfig
 	
-		self.reloadConfig()
+		self.reloadConfig(True)
 		
 		#open serial interface 
 		self.ser = serial.Serial(self.config.get('config','port'),self.config.get('config','baudrate'),timeout=1)
@@ -573,3 +532,4 @@ class VeraGW():
 		#Give Arduino time to start up.
 		sleep(5)
 		self.sendCommandWithMessageType("0;0","INTERNAL",int(self.tInternalTypes["VERSION"][0]),"Get Version")
+		self.setInclutionMode(self.InclutionMode)

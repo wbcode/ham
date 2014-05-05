@@ -88,9 +88,15 @@ class Openhab():
 			hsv = state.split(',')
 			rgb = colorsys.hsv_to_rgb(float(hsv[0])/360,float(hsv[1])/100,float(hsv[2])/100)
 			hex = "%02x%02x%02x" % (int(rgb[0]*255), int(rgb[1]*255), int(rgb[2]*255))
-			print rgb
-			print hex
 			return "32;0x"+hex
+		#special for MySensor switch inclusion mode from Openhab
+		elif type == 'InclusionMode' :
+			if state == "ON" :
+				return "true"
+			elif state == "OFF" :
+				return "false"
+			else :
+				return None
 		else :
 			return None
 	

@@ -5,31 +5,31 @@ import json
 import tornado.ioloop
 import tornado.web
 import serial
-from VeraGW import *
+from msgw import *
 import ConfigParser
 
 #read config file
 config = ConfigParser.ConfigParser()
-config.read("VeraGW.conf")
+config.read("msgw.conf")
 
 # Setup logging
-log = logging.getLogger('VeraGW')
+log = logging.getLogger('msgw')
 hdlr = logging.FileHandler(config.get('config','log_file'))
 formatter = logging.Formatter('%(asctime)s %(levelname)s %(message)s')
 hdlr.setFormatter(formatter)
 log.addHandler(hdlr)
 log.setLevel(logging.DEBUG)
 
-# Create VeraGW 
-vera = VeraGW(config,log)
+# Create MySensorGateWay 
+msgw = msgw(config,log)
 
 tornadoPort = int(config.get('httpd','port'))
 cwd = os.getcwd() # used by static file server
 serialHistory = ''
 mostRecentLine = ''
 
-def checkVera():
-	line = vera.loop()
+def checkMsgw():
+	line = msgw.loop()
 	if line is not None :
 		global serialHistory
 		global mostRecentLine
@@ -67,16 +67,16 @@ class CommandHandler(tornado.web.RequestHandler):
             self.write( json.dumps(status) )
 		#reload the config file	
         elif self.get_argument('op',None) == "reloadconfig":
-			config.read("VeraGW.conf")
-			vera.reloadConfig()
+			config.read("msgw.conf")
+			msgw.reloadConfig()
 			log.info("Configuration reloaded")
         elif self.get_argument('cmd',None) is not None:
-			vera.sendCommandOne(self.get_argument('cmd',None)+'\n')
+			msgw.sendCommandOne(self.get_argument('cmd',None)+'\n')
 			status = {"server": True, "mostRecentSerial": mostRecentLine, "serialHistory": serialHistory}
 			self.write( json.dumps(status) )
         elif self.get_argument('oh',None) is not None:
 			#send to openhab file for parsing
-			vera.parseExternalCommand('OpenHab',self.get_argument('oh',None),self.get_argument('type',None),self.get_argument('state',None))
+			msgw.parseExternalCommand('OpenHab',self.get_argument('oh',None),self.get_argument('type',None),self.get_argument('state',None))
 	   #operation was not one of the ones that we know how to handle
         else:
             print self.request
@@ -99,8 +99,8 @@ application = tornado.web.Application([
 
 if __name__ == "__main__":
     
-    #tell tornado to run checkVera every 10ms
-    serial_loop = tornado.ioloop.PeriodicCallback(checkVera, 10)
+    #tell tornado to run checkMsgw every 10ms
+    serial_loop = tornado.ioloop.PeriodicCallback(checkMsgw, 10)
     serial_loop.start()
     
     #start tornado
